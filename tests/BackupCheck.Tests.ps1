@@ -133,4 +133,45 @@ Describe 'BackupCheck' {
             $m | Should -BeLike '*logdata*'
         }
     }
+
+    Context 'Invoke-BackupCheck' {
+        BeforeEach {
+            $script:dir = Join-Path $TestDrive ([guid]::NewGuid())
+            New-Item -ItemType Directory -Path $script:dir | Out-Null
+            $script:sf  = Join-Path $script:dir 'state.json'
+            $script:now = [datetime]'2026-06-08T02:00:00'
+            Mock -CommandName Send-SlackAlert -MockWith { }
+            Mock -CommandName Write-EventLogFallback -MockWith { }
+        }
+
+        It 'no Slack call on a healthy fresh backup and records size' {
+            $p = Join-Path $script:dir 'backup.daily.Sun.rar'; 'hello' | Set-Content $p
+            (Get-Item $p).LastWriteTime = [datetime]'2026-06-08T00:15:00'
+            $r = Invoke-BackupCheck -Type daily -BackupDir $script:dir -StateFile $script:sf -WebhookUrl 'http://x' -ServerName 'SQL01' -FreshnessHours 26 -Now $script:now
+            $r.Alert | Should -Be $false
+            Should -Invoke Send-SlackAlert -Times 0
+            [long](Read-State -StateFile $script:sf)['daily'].size | Should -Be (Get-Item $p).Length
+        }
+        It 'sends Slack alert on missing file and does NOT overwrite a prior good size' {
+            Write-State -StateFile $script:sf -State @{ daily = @{ size = 5000; checkedAt = 'x' } }
+            $r = Invoke-BackupCheck -Type daily -BackupDir $script:dir -StateFile $script:sf -WebhookUrl 'http://x' -ServerName 'SQL01' -FreshnessHours 26 -Now $script:now
+            $r.Issues | Should -Contain 'missing'
+            Should -Invoke Send-SlackAlert -Times 1
+            [long](Read-State -StateFile $script:sf)['daily'].size | Should -Be 5000
+        }
+        It 'sends Slack alert on shrink and updates stored size to the smaller value' {
+            Write-State -StateFile $script:sf -State @{ daily = @{ size = 5000; checkedAt = 'x' } }
+            $p = Join-Path $script:dir 'backup.daily.Sun.rar'; 'hi' | Set-Content $p
+            (Get-Item $p).LastWriteTime = [datetime]'2026-06-08T00:15:00'
+            $r = Invoke-BackupCheck -Type daily -BackupDir $script:dir -StateFile $script:sf -WebhookUrl 'http://x' -ServerName 'SQL01' -FreshnessHours 26 -Now $script:now
+            $r.Issues | Should -Contain 'shrink'
+            Should -Invoke Send-SlackAlert -Times 1
+            [long](Read-State -StateFile $script:sf)['daily'].size | Should -Be (Get-Item $p).Length
+        }
+        It 'DryRun never calls Slack even on a problem' {
+            $r = Invoke-BackupCheck -Type daily -BackupDir $script:dir -StateFile $script:sf -WebhookUrl 'http://x' -ServerName 'SQL01' -FreshnessHours 26 -Now $script:now -DryRun
+            $r.Alert | Should -Be $true
+            Should -Invoke Send-SlackAlert -Times 0
+        }
+    }
 }

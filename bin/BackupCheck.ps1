@@ -111,6 +111,82 @@ function New-AlertMessage {
     ) -join "`n"
 }
 
+function Send-SlackAlert {
+    param(
+        [Parameter(Mandatory)][string]$WebhookUrl,
+        [Parameter(Mandatory)][string]$Text
+    )
+    $payload = @{ text = $Text } | ConvertTo-Json -Depth 3
+    Invoke-RestMethod -Uri $WebhookUrl -Method Post -ContentType 'application/json' -Body $payload -TimeoutSec 20 | Out-Null
+}
+
+function Write-EventLogFallback {
+    param([Parameter(Mandatory)][string]$Text)
+    try {
+        $source = 'BackupCheck'
+        if (-not [System.Diagnostics.EventLog]::SourceExists($source)) {
+            New-EventLog -LogName Application -Source $source -ErrorAction Stop
+        }
+        Write-EventLog -LogName Application -Source $source -EntryType Error -EventId 1001 -Message $Text
+    }
+    catch {
+        Write-Warning "BackupCheck: could not write to Event Log: $($_.Exception.Message)"
+    }
+}
+
+function Invoke-BackupCheck {
+    param(
+        [Parameter(Mandatory)][ValidateSet('daily', 'logdata')][string]$Type,
+        [Parameter(Mandatory)][string]$BackupDir,
+        [Parameter(Mandatory)][string]$StateFile,
+        [Parameter(Mandatory)][string]$WebhookUrl,
+        [Parameter(Mandatory)][string]$ServerName,
+        [Parameter(Mandatory)][int]$FreshnessHours,
+        [datetime]$Now = (Get-Date),
+        [switch]$DryRun
+    )
+    try {
+        $file  = Get-LatestBackupFile -BackupDir $BackupDir -Type $Type
+        $state = Read-State -StateFile $StateFile
+        $prev  = $null
+        if ($state.ContainsKey($Type) -and $null -ne $state[$Type]) { $prev = [long]$state[$Type].size }
+
+        $result = Test-BackupHealth -File $file -PreviousSize $prev -Now $Now -FreshnessHours $FreshnessHours
+
+        if ($result.Alert) {
+            $msg = New-AlertMessage -ServerName $ServerName -Type $Type -File $file -Issues $result.Issues -PreviousSize $prev
+            if ($DryRun) {
+                Write-Host "[DryRun] Would send Slack alert:`n$msg"
+            }
+            else {
+                Send-SlackAlert -WebhookUrl $WebhookUrl -Text $msg
+            }
+        }
+        else {
+            Write-Host "BackupCheck OK: $Type, $($file.Name), $(Format-Size -Bytes ([long]$file.Length))"
+        }
+
+        # Update state only when we have a real, non-zero file (keep last good size otherwise).
+        if (-not $DryRun -and $file -and [long]$file.Length -gt 0) {
+            $state[$Type] = @{ size = [long]$file.Length; checkedAt = $Now.ToString('s') }
+            Write-State -StateFile $StateFile -State $state
+        }
+
+        return $result
+    }
+    catch {
+        $errText = "BackupCheck FAILED for '$Type' on ${ServerName}: $($_.Exception.Message)"
+        if (-not $DryRun) {
+            try { Send-SlackAlert -WebhookUrl $WebhookUrl -Text ":rotating_light: $errText" }
+            catch { Write-EventLogFallback -Text $errText }
+        }
+        else {
+            Write-Host "[DryRun] $errText"
+        }
+        return [pscustomobject]@{ Alert = $true; Issues = @('error'); CurrentSize = $null; PreviousSize = $null }
+    }
+}
+
 # ----- main guard: only runs for a real invocation, not when dot-sourced by tests -----
 if ($Type) {
     $freshness = if ($Type -eq 'daily') { $script:FreshnessDailyHours } else { $script:FreshnessWeekHours }
