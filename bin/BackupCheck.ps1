@@ -82,6 +82,35 @@ function Write-State {
     $State | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $StateFile -Encoding UTF8
 }
 
+function New-AlertMessage {
+    param(
+        [Parameter(Mandatory)][string]$ServerName,
+        [Parameter(Mandatory)][string]$Type,
+        $File,
+        [string[]]$Issues,
+        $PreviousSize
+    )
+    $reasonText = @{
+        missing = 'Backup file is MISSING'
+        zero    = 'Backup file is 0 BYTES'
+        stale   = 'Backup appears NOT to have run (file is stale)'
+        shrink  = 'Backup is SMALLER than the previous run'
+    }
+    $reasons = ($Issues | ForEach-Object { $k = $_; "${k}: $($reasonText[$k])" }) -join '; '
+    $fileName = if ($File) { $File.Name } else { '(none found)' }
+    $curText  = if ($File) { "$(Format-Size -Bytes ([long]$File.Length)) ($([long]$File.Length) B)" } else { 'n/a' }
+    $prevText = if ($null -ne $PreviousSize) { "$(Format-Size -Bytes ([long]$PreviousSize)) ($([long]$PreviousSize) B)" } else { 'unknown' }
+
+    @(
+        ":rotating_light: *MySQL backup problem on $ServerName*",
+        "*Type:* $Type",
+        "*File:* $fileName",
+        "*Current size:* $curText",
+        "*Previous size:* $prevText",
+        "*Problem:* $reasons"
+    ) -join "`n"
+}
+
 # ----- main guard: only runs for a real invocation, not when dot-sourced by tests -----
 if ($Type) {
     $freshness = if ($Type -eq 'daily') { $script:FreshnessDailyHours } else { $script:FreshnessWeekHours }

@@ -110,4 +110,27 @@ Describe 'BackupCheck' {
             (Read-State -StateFile $script:sf).Count | Should -Be 0
         }
     }
+
+    Context 'New-AlertMessage' {
+        BeforeAll {
+            function NewFakeFile2($len, $name) {
+                [pscustomobject]@{ Length = [long]$len; Name = $name; LastWriteTime = [datetime]'2026-06-08T00:15:00' }
+            }
+        }
+        It 'includes server, type, reason, and sizes for a shrink' {
+            $f = NewFakeFile2 899 'backup.daily.Tue.rar'
+            $m = New-AlertMessage -ServerName 'SQL01' -Type 'daily' -File $f -Issues @('shrink') -PreviousSize 900
+            $m | Should -BeLike '*SQL01*'
+            $m | Should -BeLike '*daily*'
+            $m | Should -BeLike '*shrink*'
+            $m | Should -BeLike '*backup.daily.Tue.rar*'
+            $m | Should -BeLike '*899 B*'
+            $m | Should -BeLike '*900 B*'
+        }
+        It 'handles a missing file (no FileInfo)' {
+            $m = New-AlertMessage -ServerName 'SQL01' -Type 'logdata' -File $null -Issues @('missing') -PreviousSize 900
+            $m | Should -BeLike '*missing*'
+            $m | Should -BeLike '*logdata*'
+        }
+    }
 }
