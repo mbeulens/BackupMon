@@ -1,0 +1,12 @@
+On the windows MySQL server we have a 2 backup scripts sheduled.
+bin/mysqlBackupDaily.bat that runs Daily at 00:10
+and
+bin/mysqlBackupLogData.bat that runs Weekly on Sunday.
+
+I would like to have a control script that checks if the .rar of today is 
+larger or equal than the one from the day before for the Daily backup.
+The same for the weekly log backup.
+Then somehow notifies somebody that is to small via email, slack, webservice?
+Wen either of the files are 0 bytes we also need a notification
+
+Can we discuss a solution

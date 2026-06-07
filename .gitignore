@@ -1,0 +1,6 @@
+# Runtime state (created on the server, never committed)
+backupcheck.state.json
+# Local test scratch
+TestResults/
+*.log
+.remember/
