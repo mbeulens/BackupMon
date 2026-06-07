@@ -1,4 +1,5 @@
-# Real MySQL credentials (only the .example is committed)
+# Real config & MySQL credentials (only the .example files are committed)
+BackupCheck.config.psd1
 mysql-creds.cnf
 # Runtime state (created on the server, never committed)
 backupcheck.state.json

@@ -5,15 +5,28 @@ param(
     [switch]$DryRun
 )
 
-# ============================ CONFIG ============================
-# Edit these for your server.
-$script:BackupDir            = 'D:\SyntecServer\backup\mysql'
-$script:StateFile           = "$script:BackupDir\backupcheck.state.json"
-$script:SlackWebhookUrl     = 'https://hooks.slack.com/services/REPLACE/WITH/REAL'
-$script:ServerName          = $env:COMPUTERNAME
-$script:FreshnessDailyHours = 26
-$script:FreshnessWeekHours  = 192   # 8 days
-# ===============================================================
+# Settings live in a separate, git-ignored config file (BackupCheck.config.psd1) next to this
+# script. Copy BackupCheck.config.example.psd1 to BackupCheck.config.psd1 and edit it.
+function Import-BackupConfig {
+    param([Parameter(Mandatory)][string]$Path)
+    if (-not (Test-Path -LiteralPath $Path)) {
+        throw "Config file not found: $Path. Copy BackupCheck.config.example.psd1 to BackupCheck.config.psd1 and fill it in."
+    }
+    $cfg = Import-PowerShellDataFile -LiteralPath $Path
+    foreach ($key in @('BackupDir', 'SlackWebhookUrl')) {
+        if ([string]::IsNullOrWhiteSpace([string]$cfg[$key])) {
+            throw "Config '$Path' is missing required key: $key"
+        }
+    }
+    [pscustomobject]@{
+        BackupDir           = [string]$cfg.BackupDir
+        SlackWebhookUrl     = [string]$cfg.SlackWebhookUrl
+        ServerName          = if ([string]::IsNullOrWhiteSpace([string]$cfg.ServerName)) { [System.Environment]::MachineName } else { [string]$cfg.ServerName }
+        FreshnessDailyHours = if ($cfg.ContainsKey('FreshnessDailyHours')) { [int]$cfg.FreshnessDailyHours } else { 26 }
+        FreshnessWeekHours  = if ($cfg.ContainsKey('FreshnessWeekHours')) { [int]$cfg.FreshnessWeekHours } else { 192 }
+        StateFile           = "$([string]$cfg.BackupDir)\backupcheck.state.json"
+    }
+}
 
 function Format-Size {
     param([Parameter(Mandatory)][long]$Bytes)
@@ -189,12 +202,13 @@ function Invoke-BackupCheck {
 
 # ----- main guard: only runs for a real invocation, not when dot-sourced by tests -----
 if ($Type) {
-    $freshness = if ($Type -eq 'daily') { $script:FreshnessDailyHours } else { $script:FreshnessWeekHours }
+    $cfg = Import-BackupConfig -Path (Join-Path $PSScriptRoot 'BackupCheck.config.psd1')
+    $freshness = if ($Type -eq 'daily') { $cfg.FreshnessDailyHours } else { $cfg.FreshnessWeekHours }
     Invoke-BackupCheck -Type $Type `
-        -BackupDir  $script:BackupDir `
-        -StateFile  $script:StateFile `
-        -WebhookUrl $script:SlackWebhookUrl `
-        -ServerName $script:ServerName `
+        -BackupDir  $cfg.BackupDir `
+        -StateFile  $cfg.StateFile `
+        -WebhookUrl $cfg.SlackWebhookUrl `
+        -ServerName $cfg.ServerName `
         -FreshnessHours $freshness `
         -DryRun:$DryRun | Out-Null
 }

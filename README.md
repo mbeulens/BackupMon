@@ -10,6 +10,7 @@ MySQL backup scripts and a monitoring/control script for the Windows MySQL serve
 | `bin/mysqlBackupLogData.bat` | Weekly dump of the log/audit tables → `.rar`, then robocopy to the backup share. Scheduled Sundays 13:30. |
 | `bin/BackupCheck.ps1` | Control script: verifies each backup `.rar` is present, non-zero, fresh, and not smaller than the previous run; alerts to Slack on any problem. |
 | `bin/mysql-creds.example.cnf` | Template for the git-ignored MySQL credentials file. |
+| `bin/BackupCheck.config.example.psd1` | Template for the git-ignored `BackupCheck.ps1` settings file. |
 | `tests/BackupCheck.Tests.ps1` | Pester test suite for `BackupCheck.ps1`. |
 | `docs/OPERATIONS.md` | Configuration and Windows Task Scheduler setup for `BackupCheck.ps1`. |
 

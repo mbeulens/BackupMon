@@ -7,6 +7,35 @@ Describe 'BackupCheck' {
         $true | Should -Be $true
     }
 
+    Context 'Import-BackupConfig' {
+        BeforeEach { $script:cfgPath = Join-Path $TestDrive ([guid]::NewGuid().ToString() + '.psd1') }
+
+        It 'throws a helpful error when the file is missing' {
+            { Import-BackupConfig -Path $script:cfgPath } | Should -Throw '*not found*'
+        }
+        It 'loads values and derives the state file path' {
+            Set-Content -LiteralPath $script:cfgPath -Value "@{ BackupDir = 'D:\backups\mysql'; SlackWebhookUrl = 'http://hook'; ServerName = 'SQL01'; FreshnessDailyHours = 30; FreshnessWeekHours = 200 }"
+            $c = Import-BackupConfig -Path $script:cfgPath
+            $c.BackupDir | Should -Be 'D:\backups\mysql'
+            $c.SlackWebhookUrl | Should -Be 'http://hook'
+            $c.ServerName | Should -Be 'SQL01'
+            $c.FreshnessDailyHours | Should -Be 30
+            $c.FreshnessWeekHours | Should -Be 200
+            $c.StateFile | Should -Be 'D:\backups\mysql\backupcheck.state.json'
+        }
+        It 'throws when a required key is missing' {
+            Set-Content -LiteralPath $script:cfgPath -Value "@{ BackupDir = 'D:\x' }"
+            { Import-BackupConfig -Path $script:cfgPath } | Should -Throw '*SlackWebhookUrl*'
+        }
+        It 'defaults freshness and server name when omitted' {
+            Set-Content -LiteralPath $script:cfgPath -Value "@{ BackupDir = 'D:\x'; SlackWebhookUrl = 'http://h' }"
+            $c = Import-BackupConfig -Path $script:cfgPath
+            $c.FreshnessDailyHours | Should -Be 26
+            $c.FreshnessWeekHours | Should -Be 192
+            $c.ServerName | Should -Not -BeNullOrEmpty
+        }
+    }
+
     Context 'Format-Size' {
         It 'formats bytes' { Format-Size -Bytes 512 | Should -Be '512 B' }
         It 'formats kilobytes' { Format-Size -Bytes 2048 | Should -Be '2.00 KB' }

@@ -18,11 +18,19 @@ The real `mysql-creds.cnf` is git-ignored; only `bin/mysql-creds.example.cnf` is
 If you change `$BackupDir` or move the creds file, update the `--defaults-extra-file=` path in both `.bat` scripts to match.
 
 ## Configure
-Edit the CONFIG block at the top of `bin/BackupCheck.ps1`:
-- `$BackupDir` — folder holding the `.rar` files (default `D:\SyntecServer\backup\mysql`).
-- `$SlackWebhookUrl` — your Slack Incoming Webhook URL.
-- `$ServerName` — defaults to the machine name; override if you want a friendlier label.
-- Freshness windows: daily `26` h, weekly `192` h (8 days).
+Settings live in a git-ignored PowerShell data file next to the script. Copy the template once:
+```powershell
+Copy-Item bin\BackupCheck.config.example.psd1 bin\BackupCheck.config.psd1
+```
+Then edit `bin\BackupCheck.config.psd1`:
+- `BackupDir` — folder holding the `.rar` files (default `D:\SyntecServer\backup\mysql`).
+- `SlackWebhookUrl` — your Slack Incoming Webhook URL (required).
+- `ServerName` — label shown in alerts; leave `''` to use the machine name.
+- `FreshnessDailyHours` / `FreshnessWeekHours` — staleness windows (defaults `26` and `192` h = 8 days).
+
+`BackupDir` and `SlackWebhookUrl` are required; the script exits with a clear error if the config
+file is missing or incomplete. Only `BackupCheck.config.example.psd1` is committed — the real
+`BackupCheck.config.psd1` is git-ignored so the webhook URL never lands in git.
 
 ## Test manually before scheduling
 Dry run (never posts to Slack, never writes state):
