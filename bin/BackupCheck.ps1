@@ -23,6 +23,32 @@ function Format-Size {
     return "$Bytes B"
 }
 
+function Test-BackupHealth {
+    param(
+        $File,                                  # FileInfo-like or $null
+        $PreviousSize,                          # [long] or $null
+        [Parameter(Mandatory)][datetime]$Now,
+        [Parameter(Mandatory)][int]$FreshnessHours
+    )
+    $issues = New-Object System.Collections.Generic.List[string]
+    if ($null -eq $File) {
+        $issues.Add('missing')
+    }
+    elseif ([long]$File.Length -eq 0) {
+        $issues.Add('zero')
+    }
+    else {
+        if ($File.LastWriteTime -lt $Now.AddHours(-$FreshnessHours)) { $issues.Add('stale') }
+        if ($null -ne $PreviousSize -and [long]$File.Length -lt [long]$PreviousSize) { $issues.Add('shrink') }
+    }
+    [pscustomobject]@{
+        Alert        = ($issues.Count -gt 0)
+        Issues       = $issues.ToArray()
+        CurrentSize  = if ($File) { [long]$File.Length } else { $null }
+        PreviousSize = $PreviousSize
+    }
+}
+
 # ----- main guard: only runs for a real invocation, not when dot-sourced by tests -----
 if ($Type) {
     $freshness = if ($Type -eq 'daily') { $script:FreshnessDailyHours } else { $script:FreshnessWeekHours }
