@@ -173,5 +173,36 @@ Describe 'BackupCheck' {
             $r.Alert | Should -Be $true
             Should -Invoke Send-SlackAlert -Times 0
         }
+    It 'sends Slack alert on a zero-byte file and does NOT overwrite a prior good size' {
+        Write-State -StateFile $script:sf -State @{ daily = @{ size = 5000; checkedAt = 'x' } }
+        $p = Join-Path $script:dir 'backup.daily.Sun.rar'; New-Item -ItemType File -Path $p | Out-Null
+        (Get-Item $p).LastWriteTime = [datetime]'2026-06-08T00:15:00'
+        $r = Invoke-BackupCheck -Type daily -BackupDir $script:dir -StateFile $script:sf -WebhookUrl 'http://x' -ServerName 'SQL01' -FreshnessHours 26 -Now $script:now
+        $r.Issues | Should -Contain 'zero'
+        Should -Invoke Send-SlackAlert -Times 1
+        [long](Read-State -StateFile $script:sf)['daily'].size | Should -Be 5000
+    }
+    It 'DryRun does not write a state file' {
+        $p = Join-Path $script:dir 'backup.daily.Sun.rar'; 'hello' | Set-Content $p
+        (Get-Item $p).LastWriteTime = [datetime]'2026-06-08T00:15:00'
+        Invoke-BackupCheck -Type daily -BackupDir $script:dir -StateFile $script:sf -WebhookUrl 'http://x' -ServerName 'SQL01' -FreshnessHours 26 -Now $script:now -DryRun | Out-Null
+        Test-Path $script:sf | Should -Be $false
+    }
+    It 'on internal error sends a Slack alert and returns an error result' {
+        Mock -CommandName Test-BackupHealth -MockWith { throw 'boom' }
+        $p = Join-Path $script:dir 'backup.daily.Sun.rar'; 'hello' | Set-Content $p
+        $r = Invoke-BackupCheck -Type daily -BackupDir $script:dir -StateFile $script:sf -WebhookUrl 'http://x' -ServerName 'SQL01' -FreshnessHours 26 -Now $script:now
+        $r.Alert | Should -Be $true
+        $r.Issues | Should -Contain 'error'
+        Should -Invoke Send-SlackAlert -Times 1
+    }
+    It 'on internal error with Slack failure falls back to the event log' {
+        Mock -CommandName Test-BackupHealth -MockWith { throw 'boom' }
+        Mock -CommandName Send-SlackAlert -MockWith { throw 'slack down' }
+        $p = Join-Path $script:dir 'backup.daily.Sun.rar'; 'hello' | Set-Content $p
+        $r = Invoke-BackupCheck -Type daily -BackupDir $script:dir -StateFile $script:sf -WebhookUrl 'http://x' -ServerName 'SQL01' -FreshnessHours 26 -Now $script:now
+        $r.Issues | Should -Contain 'error'
+        Should -Invoke Write-EventLogFallback -Times 1
+    }
     }
 }
