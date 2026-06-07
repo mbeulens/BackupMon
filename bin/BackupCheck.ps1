@@ -49,6 +49,17 @@ function Test-BackupHealth {
     }
 }
 
+function Get-LatestBackupFile {
+    param(
+        [Parameter(Mandatory)][string]$BackupDir,
+        [Parameter(Mandatory)][ValidateSet('daily', 'logdata')][string]$Type
+    )
+    $pattern = if ($Type -eq 'daily') { 'backup.daily.*.rar' } else { 'backup.logdata.*.rar' }
+    Get-ChildItem -Path $BackupDir -Filter $pattern -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
+}
+
 # ----- main guard: only runs for a real invocation, not when dot-sourced by tests -----
 if ($Type) {
     $freshness = if ($Type -eq 'daily') { $script:FreshnessDailyHours } else { $script:FreshnessWeekHours }

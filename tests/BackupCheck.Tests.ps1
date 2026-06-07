@@ -66,4 +66,28 @@ Describe 'BackupCheck' {
             $r.Issues | Should -Contain 'shrink'
         }
     }
+
+    Context 'Get-LatestBackupFile' {
+        BeforeEach {
+            $script:dir = Join-Path $TestDrive ([guid]::NewGuid())
+            New-Item -ItemType Directory -Path $script:dir | Out-Null
+        }
+        It 'returns null when no files match' {
+            Get-LatestBackupFile -BackupDir $script:dir -Type 'daily' | Should -Be $null
+        }
+        It 'returns the newest daily file by LastWriteTime' {
+            $old = Join-Path $script:dir 'backup.daily.Mon.rar'; 'a' | Set-Content $old
+            Start-Sleep -Milliseconds 50
+            $new = Join-Path $script:dir 'backup.daily.Tue.rar'; 'bb' | Set-Content $new
+            (Get-LatestBackupFile -BackupDir $script:dir -Type 'daily').Name | Should -Be 'backup.daily.Tue.rar'
+        }
+        It 'does not return logdata files for daily type' {
+            'a' | Set-Content (Join-Path $script:dir 'backup.logdata.Sun.rar')
+            Get-LatestBackupFile -BackupDir $script:dir -Type 'daily' | Should -Be $null
+        }
+        It 'returns the logdata file for logdata type' {
+            'a' | Set-Content (Join-Path $script:dir 'backup.logdata.Sun.rar')
+            (Get-LatestBackupFile -BackupDir $script:dir -Type 'logdata').Name | Should -Be 'backup.logdata.Sun.rar'
+        }
+    }
 }
