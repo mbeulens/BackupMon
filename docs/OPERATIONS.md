@@ -1,5 +1,22 @@
 # BackupCheck — Operations
 
+## MySQL credentials (backup scripts)
+The backup scripts (`bin/mysqlBackupDaily.bat`, `bin/mysqlBackupLogData.bat`) read the MySQL
+password from a git-ignored option file via `mysqldump --defaults-extra-file=...`, so the
+password never appears on the command line, in the process list, or in Task Scheduler logs.
+
+Set it up once on the server:
+1. Copy `bin/mysql-creds.example.cnf` to **`D:\SyntecServer\backup\mysql-creds.cnf`**
+   (in `backup\`, the parent of `backup\mysql\`, so the weekly robocopy does **not** ship it off-server).
+2. Edit the file and fill in the real `password=` (and adjust `user=` if not `root`).
+3. Restrict its NTFS permissions so only the backup/service account can read it:
+   ```bat
+   icacls "D:\SyntecServer\backup\mysql-creds.cnf" /inheritance:r /grant:r "SYSTEM:R" "Administrators:R"
+   ```
+
+The real `mysql-creds.cnf` is git-ignored; only `bin/mysql-creds.example.cnf` is committed.
+If you change `$BackupDir` or move the creds file, update the `--defaults-extra-file=` path in both `.bat` scripts to match.
+
 ## Configure
 Edit the CONFIG block at the top of `bin/BackupCheck.ps1`:
 - `$BackupDir` — folder holding the `.rar` files (default `D:\SyntecServer\backup\mysql`).
