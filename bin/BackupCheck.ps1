@@ -8,7 +8,7 @@ param(
 # ============================ CONFIG ============================
 # Edit these for your server.
 $script:BackupDir            = 'D:\SyntecServer\backup\mysql'
-$script:StateFile           = Join-Path $script:BackupDir 'backupcheck.state.json'
+$script:StateFile           = "$script:BackupDir\backupcheck.state.json"
 $script:SlackWebhookUrl     = 'https://hooks.slack.com/services/REPLACE/WITH/REAL'
 $script:ServerName          = $env:COMPUTERNAME
 $script:FreshnessDailyHours = 26
