@@ -27,7 +27,16 @@ The backup scripts read the MySQL password from a git-ignored option file via
 `BackupCheck.ps1 -Type daily|logdata` checks the latest matching archive and posts a Slack
 alert if it is **missing**, **0 bytes**, **stale** (the backup likely did not run), or
 **smaller** than the previously recorded size. It keeps the last good size per type in a
-git-ignored `backupcheck.state.json`. See `docs/OPERATIONS.md` for configuration and scheduling.
+git-ignored `backupcheck.state.json`.
+
+Settings (backup folder, Slack webhook, freshness windows) live in a git-ignored
+`bin/BackupCheck.config.psd1`. Copy the template once and fill it in:
+
+```powershell
+Copy-Item bin\BackupCheck.config.example.psd1 bin\BackupCheck.config.psd1
+```
+
+See `docs/OPERATIONS.md` for full configuration and scheduling.
 
 Run the tests (PowerShell + [Pester 5](https://pester.dev)):
 
@@ -38,7 +47,7 @@ Invoke-Pester -Path tests/BackupCheck.Tests.ps1 -Output Detailed
 ## Versioning & branches
 
 - Work happens on `dev`; `master` holds released versions.
-- Patch releases (`0.1.x`) are routine commits on `dev`.
+- Patch releases (`x.y.z`) are routine commits on `dev`.
 - Minor/major releases update this README + `CHANGELOG.md`, then merge `dev` → `master`.
 
 See `CHANGELOG.md` for the version history.
