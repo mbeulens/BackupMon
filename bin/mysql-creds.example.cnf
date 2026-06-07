@@ -1,0 +1,18 @@
+; ---------------------------------------------------------------------------
+; MySQL credentials for the backup scripts.
+;
+; SETUP (on the MySQL server):
+;   1. Copy this file to:  D:\SyntecServer\backup\mysql-creds.cnf
+;      (the parent of the backup\mysql folder, so robocopy does NOT copy it off-server)
+;   2. Fill in the real password below.
+;   3. Restrict NTFS permissions so only the backup/service account can read it:
+;        icacls "D:\SyntecServer\backup\mysql-creds.cnf" /inheritance:r /grant:r "SYSTEM:R" "Administrators:R"
+;
+; The scripts read it via:  mysqldump --defaults-extra-file="D:\SyntecServer\backup\mysql-creds.cnf"
+; so the password never appears on the command line or in Task Scheduler logs.
+;
+; NOTE: mysql-creds.cnf is git-ignored. Only this .example file is committed.
+; ---------------------------------------------------------------------------
+[client]
+user=root
+password=PUT_REAL_PASSWORD_HERE

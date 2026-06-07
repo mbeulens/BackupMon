@@ -1,3 +1,5 @@
+# Real MySQL credentials (only the .example is committed)
+mysql-creds.cnf
 # Runtime state (created on the server, never committed)
 backupcheck.state.json
 # Local test scratch
