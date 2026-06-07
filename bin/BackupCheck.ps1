@@ -60,6 +60,28 @@ function Get-LatestBackupFile {
         Select-Object -First 1
 }
 
+function Read-State {
+    param([Parameter(Mandatory)][string]$StateFile)
+    if (-not (Test-Path -LiteralPath $StateFile)) { return @{} }
+    try {
+        $raw = Get-Content -LiteralPath $StateFile -Raw -ErrorAction Stop
+        if ([string]::IsNullOrWhiteSpace($raw)) { return @{} }
+        $obj = $raw | ConvertFrom-Json -ErrorAction Stop
+        $ht = @{}
+        foreach ($p in $obj.PSObject.Properties) { $ht[$p.Name] = $p.Value }
+        return $ht
+    }
+    catch { return @{} }
+}
+
+function Write-State {
+    param(
+        [Parameter(Mandatory)][string]$StateFile,
+        [Parameter(Mandatory)][hashtable]$State
+    )
+    $State | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath $StateFile -Encoding UTF8
+}
+
 # ----- main guard: only runs for a real invocation, not when dot-sourced by tests -----
 if ($Type) {
     $freshness = if ($Type -eq 'daily') { $script:FreshnessDailyHours } else { $script:FreshnessWeekHours }

@@ -90,4 +90,24 @@ Describe 'BackupCheck' {
             (Get-LatestBackupFile -BackupDir $script:dir -Type 'logdata').Name | Should -Be 'backup.logdata.Sun.rar'
         }
     }
+
+    Context 'State I/O' {
+        BeforeEach { $script:sf = Join-Path $TestDrive ([guid]::NewGuid().ToString() + '.json') }
+
+        It 'returns empty hashtable when file missing' {
+            $s = Read-State -StateFile $script:sf
+            $s | Should -BeOfType System.Collections.Hashtable
+            $s.Count | Should -Be 0
+        }
+        It 'round-trips a stored size' {
+            $state = @{ daily = @{ size = 12345; checkedAt = '2026-06-08T02:00:00' } }
+            Write-State -StateFile $script:sf -State $state
+            $read = Read-State -StateFile $script:sf
+            [long]$read['daily'].size | Should -Be 12345
+        }
+        It 'returns empty hashtable on corrupt json' {
+            'not json {{{' | Set-Content $script:sf
+            (Read-State -StateFile $script:sf).Count | Should -Be 0
+        }
+    }
 }
